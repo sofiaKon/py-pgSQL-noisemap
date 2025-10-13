@@ -4,13 +4,16 @@ import pandas as pd
 from sqlalchemy import create_engine, text
 
 
-# ---------------- config ----------------
+# ----------------Connect with config ----------------
 
 
 def load_db_config(path="app/config.env"):
+
     # поддерживаем host, port, user, password, database
+
     data_dic = {"host": None, "port": 5432,
                 "user": None, "password": None, "database": None}
+
     with open(path, "r", encoding="utf-8") as f:
         for raw in f:
             if "=" not in raw or raw.lstrip().startswith("#"):
@@ -27,6 +30,9 @@ def load_db_config(path="app/config.env"):
     return data_dic
 
 
+# ----------------Enter personal password ----------------
+
+
 cfg = load_db_config()
 
 DB_URL = f"postgresql+psycopg2://{cfg['user']}:{cfg['password']}@{cfg['host']}:{cfg['port']}/{cfg['database']}"
@@ -36,7 +42,10 @@ RAW_DIR = "data/raw"
 FILES = sorted(glob.glob(f"{RAW_DIR}/*.xlsx"))
 
 
-# ------------- helpers -------------
+# --------------------- Helpers --------------------------
+
+
+# --------Find year in tables*.csv-----------
 
 
 def find_year_month(df, filename):
@@ -54,77 +63,82 @@ def find_year_month(df, filename):
     raise ValueError(f"Year/Month not found: {filename}")
 
 
+# --------Find hours/stations in tables*.csv-----------
+
+
 def parse_sheet(df_raw, station_name):
     """
-    Формат листа:
-      - строка с кор. текстом '측정일' — это строка заголовков
-      - первая колонка под заголовком содержит даты (по дням, 00:00)
-      - столбцы справа — часы 1..24 (могут быть float 1.0..24.0)
-    Возвращает: station_name, date (DATE), hour (1..24), db_level
+    Return:
+
+      long_df: station_name | date | hour(1..24) | db_level
+      hours:   (ex. [1..24])
+
     """
+
     df = df_raw.copy().reset_index(drop=True)
 
-    # 1) Находим строку заголовков по наличию '측정일' (measurement date/time)
+    # 1) строка заголовков по наличию '측정일'
     header_row = None
     for i in range(min(30, len(df))):
-        row_txt = " ".join(df.iloc[i].astype(str).tolist())
-        if "측정일" in row_txt:
+        if "측정일" in " ".join(df.iloc[i].astype(str).tolist()):
             header_row = i
             break
     if header_row is None:
-        return pd.DataFrame(columns=["station_name", "date", "hour", "db_level"])
+        return (pd.DataFrame(columns=["station_name", "date", "hour", "db_level"]), [])
 
-    # 2) Поднимаем заголовки и отрезаем верх
+    # 2) заголовки
+
     df.columns = df.iloc[header_row]
     df = df.iloc[header_row + 1:].reset_index(drop=True)
 
-    # 3) Определяем колонку с датой (та, где заголовок содержит '측정')
-    date_col = None
-    for c in df.columns:
-        if isinstance(c, str) and ("측정" in c or "시간" in c):
-            date_col = c
-            break
-    if date_col is None:
-        #  берём первую колонку
-        date_col = df.columns[0]
+    # 3) колонка с датой
 
-    # 4) Преобразуем первую колонку в дату
+    date_col = next((c for c in df.columns
+                     if isinstance(c, str) and ("측정" in c or "시간" in c)), df.columns[0])
+
+    # 4) даты
+
     dts = pd.to_datetime(df[date_col], errors="coerce")
     df = df[dts.notna()].copy()
     df["date"] = dts.dt.date
 
-    # 5) Часовые столбцы
+    # 5) часовые столбцы из заголовка
     hour_cols = []
+    hours = []
     for c in df.columns:
-        if c == date_col or c == "date":
+        if c in (date_col, "date"):
             continue
         try:
-            val = float(c)  # бывает 1.0, 2.0
-            if 1 <= val <= 24 and float(val).is_integer():
+            # бывает "1", 1, "1.0", 1.0
+            h = int(round(float(str(c).strip())))
+            if 1 <= h <= 24:
                 hour_cols.append(c)
+                hours.append(h)
         except Exception:
-            continue
+            pass
+
+    hours = sorted(set(hours))
     if not hour_cols:
-        return pd.DataFrame(columns=["station_name", "date", "hour", "db_level"])
+        return (pd.DataFrame(columns=["station_name", "date", "hour", "db_level"]), [])
 
     # 6) wide -> long
     long_df = df.melt(id_vars=["date"], value_vars=hour_cols,
                       var_name="hour_raw", value_name="db_level")
 
-    # 7) Нормализуем час и значение
+    # 7) нормализация
     long_df["hour"] = pd.to_numeric(
         long_df["hour_raw"], errors="coerce").round().astype("Int64")
     long_df.drop(columns=["hour_raw"], inplace=True)
 
     long_df["db_level"] = pd.to_numeric(
-        long_df["db_level"].astype(str).str.replace(",", "."),
-        errors="coerce"
+        long_df["db_level"].astype(str).str.replace(",", "."), errors="coerce"
     ).round(2)
 
     long_df = long_df.dropna(subset=["hour", "db_level"])
     long_df["station_name"] = station_name
+    long_df["hour"] = long_df["hour"].astype(int)
 
-    return long_df[["station_name", "date", "hour", "db_level"]].astype({"hour": "int64"})
+    return long_df[["station_name", "date", "hour", "db_level"]], hours
 
 
 def ensure_tables(conn):

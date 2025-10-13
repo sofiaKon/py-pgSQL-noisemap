@@ -23,42 +23,41 @@ CREATE TABLE IF NOT EXISTS noise_reading (
     CONSTRAINT uq_noise_station_ts UNIQUE (station_id, ts_utc)
 );
 
+-- Почасовая витрина по каждой станции (KST-час)
+CREATE TABLE IF NOT EXISTS noise_level_h (
+    station_id INT NOT NULL REFERENCES stations(station_id) ON DELETE CASCADE,
+    ts_hour_kst TIMESTAMP NOT NULL,
+    -- начало часа в KST
+    n_samples INT NOT NULL,
+    laeq NUMERIC(6, 2),
+    -- эквивалентный уровень (энергетич. ср.)
+    lmin NUMERIC(6, 2),
+    lmax NUMERIC(6, 2),
+    l10 NUMERIC(6, 2),
+    l50 NUMERIC(6, 2),
+    l90 NUMERIC(6, 2),
+    src_month DATE,
+    -- из сырых для удобства
+    created_at TIMESTAMP DEFAULT now(),
+    PRIMARY KEY (station_id, ts_hour_kst)
+);
+
+CREATE INDEX IF NOT EXISTS idx_noise_level_h_month ON noise_level_h (src_month);
+
+CREATE INDEX IF NOT EXISTS idx_noise_reading_station_ts ON noise_reading (station_id, ts_utc);
+
+CREATE INDEX IF NOT EXISTS idx_noise_level_h_ts ON noise_level_h (ts_hour_kst);
+
 CREATE INDEX idx_noise_ts ON noise_reading(ts_utc);
 
 CREATE INDEX idx_noise_station ON noise_reading(station_id);
 
--- для stations (чтобы работал ON CONFLICT (name))
 ALTER TABLE
     stations
 ADD
     CONSTRAINT uq_stations_name UNIQUE (name);
 
--- для noise_reading (чтобы работал ON CONFLICT (station_id, ts_utc))
 ALTER TABLE
     noise_reading
 ADD
     CONSTRAINT uq_noise_station_ts UNIQUE (station_id, ts_utc);
-
--- дубли имён станций
-SELECT
-    name,
-    COUNT(*)
-FROM
-    stations
-GROUP BY
-    name
-HAVING
-    COUNT(*) > 1;
-
--- дубли измерений по паре (station_id, ts_utc)
-SELECT
-    station_id,
-    ts_utc,
-    COUNT(*)
-FROM
-    noise_reading
-GROUP BY
-    station_id,
-    ts_utc
-HAVING
-    COUNT(*) > 1;
