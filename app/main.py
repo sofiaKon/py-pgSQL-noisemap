@@ -1,5 +1,5 @@
+from pathlib import Path
 import re
-import glob
 import pandas as pd
 from sqlalchemy import create_engine, text
 
@@ -9,7 +9,7 @@ from sqlalchemy import create_engine, text
 
 def load_db_config(path="app/config.env"):
 
-    # поддерживаем host, port, user, password, database
+ # ------support host, port, user, password, database---------
 
     data_dic = {"host": None, "port": 5432,
                 "user": None, "password": None, "database": None}
@@ -26,21 +26,15 @@ def load_db_config(path="app/config.env"):
 
     for k in ("host", "user", "password", "database"):
         if not data_dic[k]:
-            raise ValueError(f"В config.env не задано поле: {k}")
+            raise ValueError(f"В config.env - field not specified: {k}")
     return data_dic
 
 
 # ----------------Enter personal password ----------------
 
-
 cfg = load_db_config()
-
 DB_URL = f"postgresql+psycopg2://{cfg['user']}:{cfg['password']}@{cfg['host']}:{cfg['port']}/{cfg['database']}"
 engine = create_engine(DB_URL)
-
-RAW_DIR = "data/raw"
-FILES = sorted(glob.glob(f"{RAW_DIR}/*.xlsx"))
-
 
 # --------------------- Helpers --------------------------
 
@@ -48,19 +42,17 @@ FILES = sorted(glob.glob(f"{RAW_DIR}/*.xlsx"))
 # --------Find year in tables*.csv-----------
 
 
-def find_year_month(df, filename):
+def find_year_month(df: pd.DataFrame):
 
     pat = re.compile(r"(\d{4})\s*년\s*(\d{1,2})\s*월")
     for col in df.columns:
         for v in df[col].astype(str):
             m = pat.search(v)
             if m:
-                return int(m.group(1)), int(m.group(2))
-
-    m = re.search(r"(\d{4})[^\d]+(\d{1,2})", filename)
-    if m:
-        return int(m.group(1)), int(m.group(2))
-    raise ValueError(f"Year/Month not found: {filename}")
+                y, mth = int(m.group(1)), int(m.group(2))
+                if 1 <= mth <= 12:
+                    return y, mth
+    return None
 
 
 # --------Find hours/stations in tables*.csv-----------
@@ -77,7 +69,7 @@ def parse_sheet(df_raw, station_name):
 
     df = df_raw.copy().reset_index(drop=True)
 
-    # 1) строка заголовков по наличию '측정일'
+    # 1) a row of titles by availability '측정일'
     header_row = None
     for i in range(min(30, len(df))):
         if "측정일" in " ".join(df.iloc[i].astype(str).tolist()):
@@ -86,30 +78,30 @@ def parse_sheet(df_raw, station_name):
     if header_row is None:
         return (pd.DataFrame(columns=["station_name", "date", "hour", "db_level"]), [])
 
-    # 2) заголовки
+    # 2) titles
 
     df.columns = df.iloc[header_row]
     df = df.iloc[header_row + 1:].reset_index(drop=True)
 
-    # 3) колонка с датой
+    # 3) date columns
 
     date_col = next((c for c in df.columns
                      if isinstance(c, str) and ("측정" in c or "시간" in c)), df.columns[0])
 
-    # 4) даты
+    # 4) dates
 
     dts = pd.to_datetime(df[date_col], errors="coerce")
     df = df[dts.notna()].copy()
     df["date"] = dts.dt.date
 
-    # 5) часовые столбцы из заголовка
+    # 5) hour columns from the header
     hour_cols = []
     hours = []
     for c in df.columns:
         if c in (date_col, "date"):
             continue
         try:
-            # бывает "1", 1, "1.0", 1.0
+            # "1", 1, "1.0", 1.0
             h = int(round(float(str(c).strip())))
             if 1 <= h <= 24:
                 hour_cols.append(c)
@@ -125,7 +117,7 @@ def parse_sheet(df_raw, station_name):
     long_df = df.melt(id_vars=["date"], value_vars=hour_cols,
                       var_name="hour_raw", value_name="db_level")
 
-    # 7) нормализация
+    # 7) normalization
     long_df["hour"] = pd.to_numeric(
         long_df["hour_raw"], errors="coerce").round().astype("Int64")
     long_df.drop(columns=["hour_raw"], inplace=True)
@@ -141,13 +133,15 @@ def parse_sheet(df_raw, station_name):
     return long_df[["station_name", "date", "hour", "db_level"]], hours
 
 
+# ------Create database/tables-------
+
 def ensure_tables(conn):
     conn.execute(text("CREATE EXTENSION IF NOT EXISTS postgis;"))
     conn.execute(text("""
         CREATE TABLE IF NOT EXISTS stations(
             station_id SERIAL PRIMARY KEY,
             name TEXT UNIQUE NOT NULL,
-            location geometry(Point,4326)
+            geom geometry(Point,4326)
         );
     """))
     conn.execute(text("""
@@ -170,15 +164,16 @@ def upsert_stations(names, conn):
     for n in sorted(set(names)):
         conn.execute(text("""
             INSERT INTO stations(name, geom)
-            VALUES (:n, ST_SetSRID(ST_MakePoint(126.9780, 37.5665), 4326)) 
+            VALUES (:n, ST_SetSRID(ST_MakePoint(126.9780, 37.5665), 4326))
             ON CONFLICT (name) DO NOTHING;
         """), {"n": n})
 
 
 def insert_measurements(df_all, conn):
     """
-    Ждёт колонки: station_name (TEXT), date (DATE), hour (1..24), db_level (NUMERIC).
-    Собирает локальное время Asia/Seoul: date + (hour-1)h → переводит в UTC.
+    Expect for columns: station_name (TEXT), date (DATE), hour (1..24), db_level (NUMERIC).
+    Collects local time Asia/Seoul: date + (hour-1)h → translate into UTC.
+
     """
     conn.execute(text("DROP TABLE IF EXISTS _noise_tmp;"))
     conn.execute(text("""
@@ -196,9 +191,8 @@ def insert_measurements(df_all, conn):
     conn.execute(text("""
         INSERT INTO noise_reading(station_id, ts_utc, db_level, part_of_day)
         SELECT s.station_id,
-               -- локальное (Сеул) = date + (hour-1)h → затем в UTC
                ((t.d + (t.hour-1) * INTERVAL '1 hour')::timestamp
-                AT TIME ZONE 'Asia/Seoul') AT TIME ZONE 'UTC' AS ts_utc,
+                AT TIME ZONE 'Asia/Seoul') AS ts_utc,
                t.db_level,
                CASE WHEN t.hour BETWEEN 7 AND 21 THEN 'day' ELSE 'night' END
         FROM _noise_tmp t
@@ -211,35 +205,38 @@ def insert_measurements(df_all, conn):
 
 # ------------- main -------------
 try:
-    # разово создаём/проверяем таблицы
+
     with engine.begin() as conn:
         ensure_tables(conn)
 
-    for path in FILES:
-        print(f"\nFile: {path}")
+    RAW_DIR = Path("data/raw")
+    files = sorted(RAW_DIR.glob("*.xlsx"))
+    print("Files:", [p.name for p in files])
+    for path in files:
+        print("→", path)
 
-        # 1) читаем книгу и все листы как «сырые» таблицы
+        # 1) read the book and all the sheets as "raw" tables
         xls = pd.ExcelFile(path)
         sheets = {name: xls.parse(name, header=None)
                   for name in xls.sheet_names}
 
-        # 2) парсим каждый лист (dry-run лог)
+        # 2) parse each sheet
         frames = []
         for sheet_name, df in sheets.items():
-            parsed = parse_sheet(df, sheet_name)
-            print(f"  - {sheet_name}: parsed {len(parsed)} rows")
-            frames.append(parsed)
+            long_df, hours = parse_sheet(df, sheet_name)
+            print(f"  - {sheet_name}: parsed {len(long_df)} rows")
+            frames.append(long_df)
 
-        # 3) если пусто — пропускаем файл
+        # 3) if it is empty, skip the file
         total = sum(len(x) for x in frames)
         if total == 0:
             print(f"SKIP (no data): {path}")
             continue
 
-        # 4) склеиваем
+        # 4) concat
         all_data = pd.concat(frames, ignore_index=True)
 
-        # 5) (опционально) чистим имена станций: убираем суффикс "(시간별)"
+        # 5) (optional) we clean the names of the stations: remove the suffix "(시간별)"
         all_data["station_name"] = (
             all_data["station_name"]
             .astype(str)
@@ -247,7 +244,7 @@ try:
             .str.strip()
         )
 
-        # 6) вставка в БД (upsert'ы)
+        # 6) inserting into the database (upserts)
         with engine.begin() as conn:
             upsert_stations(all_data["station_name"], conn)
             insert_measurements(all_data, conn)
