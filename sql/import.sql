@@ -23,30 +23,19 @@ CREATE TABLE IF NOT EXISTS noise_reading (
     CONSTRAINT uq_noise_station_ts UNIQUE (station_id, ts_utc)
 );
 
--- Почасовая витрина по каждой станции (KST-час)
-CREATE TABLE IF NOT EXISTS noise_level_h (
+CREATE TABLE IF NOT EXISTS noise_level_d (
     station_id INT NOT NULL REFERENCES stations(station_id) ON DELETE CASCADE,
-    ts_hour_kst TIMESTAMP NOT NULL,
-    -- начало часа в KST
-    n_samples INT NOT NULL,
-    laeq NUMERIC(6, 2),
-    -- эквивалентный уровень (энергетич. ср.)
-    lmin NUMERIC(6, 2),
-    lmax NUMERIC(6, 2),
-    l10 NUMERIC(6, 2),
-    l50 NUMERIC(6, 2),
-    l90 NUMERIC(6, 2),
-    src_month DATE,
-    -- из сырых для удобства
+    d_kst DATE NOT NULL,
+    -- дата (KST)
+    laeq_day NUMERIC(6, 2),
+    -- уже посчитанный LAeq за день
+    laeq_night NUMERIC(6, 2),
     created_at TIMESTAMP DEFAULT now(),
-    PRIMARY KEY (station_id, ts_hour_kst)
+    updated_at TIMESTAMP,
+    PRIMARY KEY (station_id, d_kst)
 );
 
-CREATE INDEX IF NOT EXISTS idx_noise_level_h_month ON noise_level_h (src_month);
-
 CREATE INDEX IF NOT EXISTS idx_noise_reading_station_ts ON noise_reading (station_id, ts_utc);
-
-CREATE INDEX IF NOT EXISTS idx_noise_level_h_ts ON noise_level_h (ts_hour_kst);
 
 CREATE INDEX idx_noise_ts ON noise_reading(ts_utc);
 
