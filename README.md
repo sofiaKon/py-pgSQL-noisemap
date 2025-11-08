@@ -1,4 +1,4 @@
-<p align="right">🌐 Languages: <b>English</b> · <a href="README_ko.md">한국어</a></p>
+<p align="right">🌐 Languages: <b>English</b>  <a href="README_ko.md">한국어</a></p>
 
 # NoiseMap Seoul — Python / pgSQL Analytics
 

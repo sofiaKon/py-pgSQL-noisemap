@@ -104,75 +104,93 @@ def find_year_month(df: pd.DataFrame):
 def parse_sheet(df_raw, station_name):
     """
     Return:
-      long_df: station_name | date | hour(1..24) | db_level
-      hours:   (ex. [1..24])
-
+      long_df:     station_name | date | hour(1..24) | db_level
+      hours:       список часов (напр., [1..24])
+      daynight_df: station_name | date | laeq_day | laeq_night  (если колонок нет — пустой DF)
     """
 
     df = df_raw.copy().reset_index(drop=True)
 
-    # 1) a row of titles by availability '측정일'
+    # 1) find if exist "측정일"
     header_row = None
     for i in range(min(30, len(df))):
         if "측정일" in " ".join(df.iloc[i].astype(str).tolist()):
             header_row = i
             break
     if header_row is None:
-        return (pd.DataFrame(columns=["station_name", "date", "hour", "db_level"]), [])
+        empty_long = pd.DataFrame(
+            columns=["station_name", "date", "hour", "db_level"])
+        empty_dn = pd.DataFrame(
+            columns=["station_name", "date", "laeq_day", "laeq_night"])
+        return empty_long, [], empty_dn
 
     # 2) titles
-
     df.columns = df.iloc[header_row]
     df = df.iloc[header_row + 1:].reset_index(drop=True)
 
-    # 3) date columns
-
+    # 3) date colomns  ("측정" or "시간")
     date_col = next((c for c in df.columns
                      if isinstance(c, str) and ("측정" in c or "시간" in c)), df.columns[0])
 
-    # 4) dates
-
+    # 4) date normalization
     dts = pd.to_datetime(df[date_col], errors="coerce")
     df = df[dts.notna()].copy()
     df["date"] = dts.dt.date
 
-    # 5) hour columns from the header
-    hour_cols = []
-    hours = []
+    # 5) group hour columns 1..24
+    hour_cols, hours = [], []
     for c in df.columns:
         if c in (date_col, "date"):
             continue
         try:
-            # "1", 1, "1.0", 1.0
             h = int(round(float(str(c).strip())))
             if 1 <= h <= 24:
                 hour_cols.append(c)
                 hours.append(h)
         except Exception:
             pass
-
     hours = sorted(set(hours))
-    if not hour_cols:
-        return (pd.DataFrame(columns=["station_name", "date", "hour", "db_level"]), [])
+    # --- wide -> long ---
+    if hour_cols:
+        long_df = df.melt(id_vars=["date"], value_vars=hour_cols,
+                          var_name="hour_raw", value_name="db_level")
+        long_df["hour"] = pd.to_numeric(
+            long_df["hour_raw"], errors="coerce").round().astype("Int64")
+        long_df.drop(columns=["hour_raw"], inplace=True)
+        long_df["db_level"] = pd.to_numeric(
+            long_df["db_level"].astype(str).str.replace(",", "."), errors="coerce"
+        ).round(2)
+        long_df = long_df.dropna(subset=["hour", "db_level"])
+        long_df["station_name"] = station_name
+        long_df["hour"] = long_df["hour"].astype(int)
+        long_df = long_df[["station_name", "date", "hour", "db_level"]]
+    else:
+        long_df = pd.DataFrame(
+            columns=["station_name", "date", "hour", "db_level"])
 
-    # 6) wide -> long
-    long_df = df.melt(id_vars=["date"], value_vars=hour_cols,
-                      var_name="hour_raw", value_name="db_level")
+    # 6) day/night LAeq
+    day_candidates = ["낮", "day", "Day", "DAY"]
+    night_candidates = ["밤", "night", "Night", "NIGHT"]
 
-    # 7) normalization
-    long_df["hour"] = pd.to_numeric(
-        long_df["hour_raw"], errors="coerce").round().astype("Int64")
-    long_df.drop(columns=["hour_raw"], inplace=True)
+    day_col = next((c for c in day_candidates if c in df.columns), None)
+    night_col = next((c for c in night_candidates if c in df.columns), None)
 
-    long_df["db_level"] = pd.to_numeric(
-        long_df["db_level"].astype(str).str.replace(",", "."), errors="coerce"
-    ).round(2)
+    if day_col and night_col:
+        dn = df[[date_col, day_col, night_col]].copy()
+        dn = dn.rename(columns={date_col: "date",
+                       day_col: "laeq_day", night_col: "laeq_night"})
 
-    long_df = long_df.dropna(subset=["hour", "db_level"])
-    long_df["station_name"] = station_name
-    long_df["hour"] = long_df["hour"].astype(int)
+        for c in ("laeq_day", "laeq_night"):
+            dn[c] = pd.to_numeric(dn[c].astype(str).str.replace(
+                ",", "."), errors="coerce").round(2)
+        dn = dn.dropna(subset=["laeq_day", "laeq_night"])
+        dn["station_name"] = station_name
+        daynight_df = dn[["station_name", "date", "laeq_day", "laeq_night"]]
+    else:
+        daynight_df = pd.DataFrame(
+            columns=["station_name", "date", "laeq_day", "laeq_night"])
 
-    return long_df[["station_name", "date", "hour", "db_level"]], hours
+    return long_df, hours, daynight_df
 
 
 # ------Create database/tables-------
@@ -212,27 +230,25 @@ def ensure_tables(conn):
         );
 
     """))
-    conn.execute(text("""CREATE INDEX IF NOT EXISTS
-                      idx_noise_reading_station_ts ON noise_reading (station_id, ts_utc););
-    """))
-    conn.execute(text("""CREATE INDEX idx_noise_ts ON noise_reading(ts_utc););
-    """))
-    conn.execute(text("""CREATE INDEX idx_noise_station ON noise_reading(station_id););
-    """))
     conn.execute(text("""
-        ALTER TABLE
-            stations
-        ADD
-            CONSTRAINT uq_stations_name UNIQUE (name);
+        CREATE TABLE IF NOT EXISTS noise_level_h (
+            station_id   INT NOT NULL REFERENCES stations(station_id) ON DELETE CASCADE,
+            ts_hour_kst  TIMESTAMP NOT NULL,
+            n_samples    INT,
+            laeq         NUMERIC(6,2) NOT NULL,
+            created_at   TIMESTAMP DEFAULT now(),
+            updated_at   TIMESTAMP,
+            PRIMARY KEY (station_id, ts_hour_kst)
         );
     """))
-    conn.execute(text("""
-        ALTER TABLE
-            noise_reading
-        ADD
-            CONSTRAINT uq_noise_station_ts UNIQUE (station_id, ts_utc);          
-        );
-    """))
+    conn.execute(text(
+        "CREATE INDEX IF NOT EXISTS idx_h_station_ts  ON noise_level_h (station_id, ts_hour_kst);"))
+    conn.execute(text(
+        "CREATE INDEX IF NOT EXISTS idx_r_station_ts  ON noise_reading (station_id, ts_utc);"))
+    conn.execute(text(
+        "CREATE INDEX IF NOT EXISTS idx_noise_ts      ON noise_reading (ts_utc);"))
+    conn.execute(text(
+        "CREATE INDEX IF NOT EXISTS idx_noise_station ON noise_reading (station_id);"))
 
 
 def upsert_stations(names, conn):
@@ -276,45 +292,21 @@ def insert_measurements(df_all, conn):
           SET db_level = EXCLUDED.db_level,
               part_of_day = EXCLUDED.part_of_day;
     """))
-    # ---Дневные/ночные ЭУШ----
-    conn.execute(text("""
-        INSERT INTO noise_level_d (station_id, d_kst, laeq_day, laeq_night, created_at, updated_at)
-        SELECT station_id, d_kst, laeq_day, laeq_night, now(), now()
-        FROM src_daynight
-        ON CONFLICT (station_id, d_kst) DO UPDATE
-        SET laeq_day   = EXCLUDED.laeq_day,
-            laeq_night = EXCLUDED.laeq_night,
-            updated_at = now();
-    """))
-    # ----Эквивалентные почасовые ур.шума----
-    conn.execute(text("""
-        CREATE TABLE IF NOT EXISTS noise_level_h (
-            station_id   INT NOT NULL REFERENCES stations(station_id) ON DELETE CASCADE,
-            ts_hour_kst  TIMESTAMP NOT NULL,     -- начало часа (KST)
-            n_samples    INT NOT NULL,
-            laeq         NUMERIC(6,2) NOT NULL,  -- LAeq за час
-            created_at   TIMESTAMP DEFAULT now(),
-            updated_at   TIMESTAMP,
-        PRIMARY KEY (station_id, ts_hour_kst)
-        );
-    """))
-    conn.execute(text(
-        "CREATE INDEX IF NOT EXISTS idx_h_station_ts  ON noise_level_h(station_id, ts_hour_kst);"))
-    conn.execute(text(
-        "CREATE INDEX IF NOT EXISTS idx_r_station_ts  ON noise_reading (station_id, ts_utc);"))
-    # ---Время с наивысшими показателями---
-    conn.execute(text("""
-                WITH h AS (
-        SELECT
-            r.station_id,
-            date_trunc('hour', r.ts_utc AT TIME ZONE 'Asia/Seoul') AS ts_hour_kst,
-            COUNT(*)                                               AS n_samples,
-            10*LOG10( AVG(POWER(10, r.db_level/10.0)) )            AS laeq
-        FROM noise_reading r
-        WHERE r.db_level IS NOT NULL
+
+
+def refresh_hours_from_readings(conn, from_utc=None, to_utc=None):
+    sql = text("""
+        WITH h AS (
+          SELECT
+              r.station_id,
+              date_trunc('hour', r.ts_utc AT TIME ZONE 'Asia/Seoul') AS ts_hour_kst,
+              COUNT(*)                                               AS n_samples,
+              10*LOG10( AVG(POWER(10, r.db_level/10.0)) )            AS laeq
+          FROM noise_reading r
+          WHERE r.db_level IS NOT NULL
             AND (:from_utc IS NULL OR r.ts_utc >= :from_utc)
             AND (:to_utc   IS NULL OR r.ts_utc   <  :to_utc)
-        GROUP BY r.station_id, date_trunc('hour', r.ts_utc AT TIME ZONE 'Asia/Seoul')
+          GROUP BY r.station_id, date_trunc('hour', r.ts_utc AT TIME ZONE 'Asia/Seoul')
         )
         INSERT INTO noise_level_h (station_id, ts_hour_kst, n_samples, laeq, created_at, updated_at)
         SELECT station_id, ts_hour_kst, n_samples, laeq, now(), now()
@@ -323,17 +315,124 @@ def insert_measurements(df_all, conn):
         SET n_samples = EXCLUDED.n_samples,
             laeq      = EXCLUDED.laeq,
             updated_at= now();
+    """)
+    conn.execute(sql, {"from_utc": from_utc, "to_utc": to_utc})
+
+
+def insert_day_night_levels(all_dn, conn):
+    # DataFrame должен содержать: station_name | d_kst | laeq_day | laeq_night
+    df_tmp = all_dn[["station_name", "d_kst", "laeq_day", "laeq_night"]].dropna(
+        subset=["laeq_day", "laeq_night"]).copy()
+
+    conn.execute(text("DROP TABLE IF EXISTS _noise_day_tmp"))
+    conn.execute(text("""
+        CREATE TEMP TABLE _noise_day_tmp (
+            station_name TEXT,
+            d_kst DATE,
+            laeq_day NUMERIC(6,2),
+            laeq_night NUMERIC(6,2)
+        ) ON COMMIT DROP;
+    """))
+
+    df_tmp.to_sql("_noise_day_tmp", con=conn, if_exists="append", index=False)
+
+    conn.execute(text("""
+        INSERT INTO noise_level_d (station_id, d_kst, laeq_day, laeq_night, created_at, updated_at)
+        SELECT s.station_id, t.d_kst, t.laeq_day, t.laeq_night, now(), now()
+        FROM _noise_day_tmp t
+        JOIN stations s ON s.name = t.station_name
+        ON CONFLICT (station_id, d_kst) DO UPDATE
+        SET laeq_day   = EXCLUDED.laeq_day,
+            laeq_night = EXCLUDED.laeq_night,
+            updated_at = now();
     """))
 
 
-# def create
+def insert_hours_levels(h_level, conn):
+    """
+    Expect:
+      - station_name : TEXT
+      - d_kst        : date (localdate KST)
+      - hour         : int (1..24)
+      - laeq         : NUMERIC/float (LAeq за час)
+    """
+
+    df_tmp = (
+        h_level[["station_name", "d_kst", "hour", "laeq"]]
+        .dropna(subset=["d_kst", "hour", "laeq"])
+        .copy()
+    )
+
+    conn.execute(text("DROP TABLE IF EXISTS _h_levels_tmp;"))
+    conn.execute(text("""
+        CREATE TEMP TABLE _h_levels_tmp(
+          station_name TEXT,
+          d_kst        DATE,
+          hour         INT,
+          laeq         NUMERIC(6,2)
+        ) ON COMMIT DROP;
+    """))
+
+    df_tmp.to_sql("_h_levels_tmp", con=conn, if_exists="append", index=False)
+
+    conn.execute(text("""
+        INSERT INTO noise_level_h (station_id, ts_hour_kst, laeq, created_at, updated_at)
+        SELECT
+            s.station_id,
+            (t.d_kst + (t.hour-1) * INTERVAL '1 hour')::timestamp AS ts_hour_kst,
+            t.laeq,
+            now(), now()
+        FROM _h_levels_tmp t
+        JOIN stations s ON s.name = t.station_name
+        ON CONFLICT (station_id, ts_hour_kst) DO UPDATE
+        SET laeq = EXCLUDED.laeq,
+            updated_at= now();
+    """))
+
+
+def fetch_peak_times(conn, station_id=None, date_from=None, date_to=None):
+    params = {"sid": station_id, "dfrom": date_from, "dto": date_to}
+    q = text("""
+        WITH hh AS (
+                    SELECT station_id,
+                            ts_hour_kst::date                   AS d_kst,
+                            EXTRACT(HOUR FROM ts_hour_kst)::int AS h_kst,
+                            laeq
+                    FROM noise_level_h
+                    WHERE (:sid   IS NULL OR station_id = :sid)
+                        AND (:dfrom IS NULL OR ts_hour_kst::date >= :dfrom)
+                        AND (:dto   IS NULL OR ts_hour_kst::date <  :dto)
+                    ),
+        day_peak AS (
+                    SELECT DISTINCT ON (station_id, d_kst)
+                            station_id, d_kst, h_kst, laeq
+                    FROM hh
+                    ORDER BY station_id, d_kst, laeq DESC, h_kst ASC
+                    ),
+        global_peak AS (
+                    SELECT DISTINCT ON (station_id)
+                            station_id, d_kst, h_kst, laeq
+                    FROM hh
+                    ORDER BY station_id, laeq DESC, d_kst ASC, h_kst ASC
+                    )
+        SELECT 'day_peak' AS kind, station_id, d_kst, h_kst AS hour_kst, laeq FROM day_peak
+        UNION ALL
+        SELECT 'global_peak', station_id, d_kst, h_kst, laeq FROM global_peak
+        ORDER BY station_id, kind, d_kst NULLS LAST, hour_kst NULLS LAST
+    """)
+    df = pd.read_sql(q, conn, params=params)
+    return (
+        df[df["kind"] == "day_peak"].drop(
+            columns=["kind"]).reset_index(drop=True),
+        df[df["kind"] == "global_peak"].drop(
+            columns=["kind"]).reset_index(drop=True),
+    )
 
 # ------------- main -------------
 
 
 def main():
     try:
-
         engine = connect_engine()
         with engine.begin() as conn:
             ensure_tables(conn)
@@ -341,46 +440,83 @@ def main():
         RAW_DIR = Path("data/raw")
         files = sorted(RAW_DIR.glob("*.xlsx"))
         print("Files:", [p.name for p in files])
+
         for path in files:
             print("→", path)
 
-            # 1) read the book and all the sheets as "raw" tables
+            # 1) Read sheets
             xls = pd.ExcelFile(path)
             sheets = {name: xls.parse(name, header=None)
                       for name in xls.sheet_names}
 
-            # 2) parse each sheet
-            frames = []
+            # 2) parse
+            frames_h, frames_dn = [], []
             for sheet_name, df in sheets.items():
-                long_df, hours = parse_sheet(df, sheet_name)
-                print(f"  - {sheet_name}: parsed {len(long_df)} rows")
-                frames.append(long_df)
 
-            # 3) if it is empty, skip the file
-            total = sum(len(x) for x in frames)
-            if total == 0:
+                long_df, hours, daynight_df = parse_sheet(df, sheet_name)
+                print(
+                    f"  - {sheet_name}: parsed hours={len(long_df)} rows; day/night={len(daynight_df)} rows")
+                if not long_df.empty:
+                    frames_h.append(long_df)
+                if daynight_df is not None and not daynight_df.empty:
+
+                    frames_dn.append(daynight_df)
+
+            # 3) если совсем пусто — пропускаем файл
+            total_h = sum(len(x) for x in frames_h)
+            total_dn = sum(len(x) for x in frames_dn)
+            if total_h == 0 and total_dn == 0:
                 print(f"SKIP (no data): {path}")
                 continue
 
-            # 4) concat
-            all_data = pd.concat(frames, ignore_index=True)
+            # 4) объединяем
+            all_hours = pd.concat(frames_h, ignore_index=True) if frames_h else pd.DataFrame(
+                columns=["station_name", "date", "hour", "db_level"])
+            all_dn = pd.concat(frames_dn, ignore_index=True) if frames_dn else pd.DataFrame(
+                columns=["station_name", "d_kst", "laeq_day", "laeq_night"])
 
-            # 5) (optional) we clean the names of the stations: remove the suffix "(시간별)"
-            all_data["station_name"] = (
-                all_data["station_name"]
-                .astype(str)
-                .str.replace(r"\(시간별\)", "", regex=True)
-                .str.strip()
-            )
+            # 5) чистим имя станции
+            if not all_hours.empty:
+                all_hours["station_name"] = (
+                    all_hours["station_name"].astype(str)
+                    .str.replace(r"\(시간별\)", "", regex=True)
+                    .str.strip()
+                )
+            if not all_dn.empty:
+                all_dn["station_name"] = (
+                    all_dn["station_name"].astype(str)
+                    .str.replace(r"\(시간별\)", "", regex=True)
+                    .str.strip()
+                )
 
-            # 6) inserting into the database (upserts)
-            with Engine.begin() as conn:
-                upsert_stations(all_data["station_name"], conn)
-                insert_measurements(all_data, conn)
+            # 6) вставка в БД
+            with engine.begin() as conn:
+                # станции
+                names = pd.concat([
+                    all_hours["station_name"]] + ([all_dn["station_name"]] if not all_dn.empty else []),
+                    ignore_index=True
+                ) if not all_hours.empty or not all_dn.empty else pd.Series(dtype=str)
+                if not names.empty:
+                    upsert_stations(names, conn)
 
-            print(f"OK: {path} → {len(all_data)} entries")
+                # сырые часы -> noise_reading
+                if not all_hours.empty:
+                    insert_measurements(all_hours, conn)
+
+                # агрегируем часовки из noise_reading -> noise_level_h
+                if not all_hours.empty:
+                    # без диапазона; можно добавить from/to
+                    refresh_hours_from_readings(conn)
+
+                # готовые день/ночь -> noise_level_d
+                if not all_dn.empty:
+                    insert_day_night_levels(all_dn, conn)
+
+            print(
+                f"OK: {path.name} → hours:{len(all_hours)}  day/night:{len(all_dn)}")
 
         print("Done!")
 
     except Exception as _ex:
         print("[INFO] Error while working with PostgreSQL:", _ex)
+        # raise  # опционально пробрасывать дальше

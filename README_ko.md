@@ -1,4 +1,4 @@
-<p align="right">🌐 언어: <a href="README.md">English</a> · <b>한국어</b></p>
+<p align="right">🌐 언어: <a href="README.md">English</a>  <b>한국어</b></p>
 
 
 # 노이즈맵 서울 — Python / pgSQL 분석

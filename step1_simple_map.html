@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+<head>
+    
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="https://netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap-glyphicons.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.2.0/css/all.min.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/python-visualization/folium/folium/templates/leaflet.awesome.rotate.min.css"/>
+    
+            <meta name="viewport" content="width=device-width,
+                initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+            <style>
+                #map_fb1a227f9de98440453d5e6ef0a86b5e {
+                    position: relative;
+                    width: 100.0%;
+                    height: 100.0%;
+                    left: 0.0%;
+                    top: 0.0%;
+                }
+                .leaflet-container { font-size: 1rem; }
+            </style>
+
+            <style>html, body {
+                width: 100%;
+                height: 100%;
+                margin: 0;
+                padding: 0;
+            }
+            </style>
+
+            <style>#map {
+                position:absolute;
+                top:0;
+                bottom:0;
+                right:0;
+                left:0;
+                }
+            </style>
+
+            <script>
+                L_NO_TOUCH = false;
+                L_DISABLE_3D = false;
+            </script>
+
+        
+</head>
+<body>
+    
+    
+            <div class="folium-map" id="map_fb1a227f9de98440453d5e6ef0a86b5e" ></div>
+        
+</body>
+<script>
+    
+    
+            var map_fb1a227f9de98440453d5e6ef0a86b5e = L.map(
+                "map_fb1a227f9de98440453d5e6ef0a86b5e",
+                {
+                    center: [37.5663, 126.9779],
+                    crs: L.CRS.EPSG3857,
+                    ...{
+  "zoom": 12,
+  "zoomControl": true,
+  "preferCanvas": false,
+}
+
+                }
+            );
+
+            
+
+        
+    
+            var tile_layer_cca86da1caebe9258fb6f99532894767 = L.tileLayer(
+                "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+                {
+  "minZoom": 0,
+  "maxZoom": 19,
+  "maxNativeZoom": 19,
+  "noWrap": false,
+  "attribution": "\u0026copy; \u003ca href=\"https://www.openstreetmap.org/copyright\"\u003eOpenStreetMap\u003c/a\u003e contributors",
+  "subdomains": "abc",
+  "detectRetina": false,
+  "tms": false,
+  "opacity": 1,
+}
+
+            );
+        
+    
+            tile_layer_cca86da1caebe9258fb6f99532894767.addTo(map_fb1a227f9de98440453d5e6ef0a86b5e);
+        
+    
+            var marker_eda6a08ba7939fc6d51d45c4c1abf534 = L.marker(
+                [37.54457, 127.0561],
+                {
+}
+            ).addTo(map_fb1a227f9de98440453d5e6ef0a86b5e);
+        
+    
+            marker_eda6a08ba7939fc6d51d45c4c1abf534.bindTooltip(
+                `<div>
+                     Seongsu
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var marker_be873633f35dad3b95dd48fe3bf08aa9 = L.marker(
+                [37.5647, 126.9769],
+                {
+}
+            ).addTo(map_fb1a227f9de98440453d5e6ef0a86b5e);
+        
+    
+            marker_be873633f35dad3b95dd48fe3bf08aa9.bindTooltip(
+                `<div>
+                     City Hall
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var marker_450f5d62eb972924f92f103ac173c6c1 = L.marker(
+                [37.5128, 127.0111],
+                {
+}
+            ).addTo(map_fb1a227f9de98440453d5e6ef0a86b5e);
+        
+    
+            marker_450f5d62eb972924f92f103ac173c6c1.bindTooltip(
+                `<div>
+                     Sinsa
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var marker_3da444c988991d77b08f080a95c7933c = L.marker(
+                [37.5595, 126.9429],
+                {
+}
+            ).addTo(map_fb1a227f9de98440453d5e6ef0a86b5e);
+        
+    
+            marker_3da444c988991d77b08f080a95c7933c.bindTooltip(
+                `<div>
+                     Sinchon
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+</script>
+</html>

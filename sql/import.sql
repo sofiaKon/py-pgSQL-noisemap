@@ -35,6 +35,18 @@ CREATE TABLE IF NOT EXISTS noise_level_d (
     PRIMARY KEY (station_id, d_kst)
 );
 
+CREATE TABLE IF NOT EXISTS noise_level_h (
+    station_id INT NOT NULL REFERENCES stations(station_id) ON DELETE CASCADE,
+    ts_hour_kst TIMESTAMP NOT NULL,
+    -- начало часа (KST)
+    n_samples INT,
+    laeq NUMERIC(6, 2) NOT NULL,
+    -- LAeq за час
+    created_at TIMESTAMP DEFAULT now(),
+    updated_at TIMESTAMP,
+    PRIMARY KEY (station_id, ts_hour_kst)
+);
+
 CREATE INDEX IF NOT EXISTS idx_noise_reading_station_ts ON noise_reading (station_id, ts_utc);
 
 CREATE INDEX idx_noise_ts ON noise_reading(ts_utc);
