@@ -14,12 +14,11 @@ from functools import lru_cache
 
 def load_db_config(path="app/config.env"):
 
- # ------support host, port, user, password, database---------
-
     data_dic = {"host": None, "port": 5432,
                 "user": None, "password": None, "database": None}
 
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, "r", encoding="utf-8", errors="replace") as f:
+
         for raw in f:
             if "=" not in raw or raw.lstrip().startswith("#"):
                 continue
@@ -34,7 +33,7 @@ def load_db_config(path="app/config.env"):
             raise ValueError(f"В config.env - field not specified: {k}")
     return data_dic
 
-# ----------------Enter personal password ----------------
+# !!! Enter personal password in config.env !!!
 
 
 @lru_cache(maxsize=1)
@@ -45,6 +44,7 @@ def connect_engine(config_path: str = "app/config.env", *, echo: bool = False) -
         f"postgresql+psycopg2://{cfg['user']}:{cfg['password']}"
         f"@{cfg['host']}:{cfg['port']}/{cfg['database']}"
     )
+    print("DB URL:", db_url)
     engine = create_engine(
         db_url,
         pool_pre_ping=True,
@@ -98,15 +98,15 @@ def find_year_month(df: pd.DataFrame):
                     return y, mth
     return None
 
-# --------Find hours/stations in tables*.csv-----------
+# --------Find hours/stations in tables*.csv---------
 
 
 def parse_sheet(df_raw, station_name):
     """
     Return:
       long_df:     station_name | date | hour(1..24) | db_level
-      hours:       список часов (напр., [1..24])
-      daynight_df: station_name | date | laeq_day | laeq_night  (если колонок нет — пустой DF)
+      hours:       list of hours (exp., [1..24])
+      daynight_df: station_name | date | laeq_day | laeq_night  
     """
 
     df = df_raw.copy().reset_index(drop=True)
@@ -192,8 +192,14 @@ def parse_sheet(df_raw, station_name):
 
     return long_df, hours, daynight_df
 
+# ------ Create Database ------
 
-# ------Create database/tables-------
+
+def ensure_database(conn):
+    conn.execute(text("CREATE DATABASE IF NOT EXISTS noise_db;"))
+
+# ------ Create tables -------
+
 
 def ensure_tables(conn):
     conn.execute(text("CREATE EXTENSION IF NOT EXISTS postgis;"))
@@ -250,6 +256,8 @@ def ensure_tables(conn):
     conn.execute(text(
         "CREATE INDEX IF NOT EXISTS idx_noise_station ON noise_reading (station_id);"))
 
+# ------- Insert data in table "stations" ----------
+
 
 def upsert_stations(names, conn):
     for n in sorted(set(names)):
@@ -258,6 +266,8 @@ def upsert_stations(names, conn):
             VALUES (:n, ST_SetSRID(ST_MakePoint(126.9780, 37.5665), 4326))
             ON CONFLICT (name) DO NOTHING;
         """), {"n": n})
+
+# ------- Insert data in table "noise_reading" -----
 
 
 def insert_measurements(df_all, conn):
@@ -293,6 +303,8 @@ def insert_measurements(df_all, conn):
               part_of_day = EXCLUDED.part_of_day;
     """))
 
+# ------- Insert data in table "noise_level_l" -----
+
 
 def refresh_hours_from_readings(conn, from_utc=None, to_utc=None):
     sql = text("""
@@ -318,9 +330,10 @@ def refresh_hours_from_readings(conn, from_utc=None, to_utc=None):
     """)
     conn.execute(sql, {"from_utc": from_utc, "to_utc": to_utc})
 
+# ------- Insert data in table "noise_level_d" -----
+
 
 def insert_day_night_levels(all_dn, conn):
-    # DataFrame должен содержать: station_name | d_kst | laeq_day | laeq_night
     df_tmp = all_dn[["station_name", "d_kst", "laeq_day", "laeq_night"]].dropna(
         subset=["laeq_day", "laeq_night"]).copy()
 
@@ -347,16 +360,10 @@ def insert_day_night_levels(all_dn, conn):
             updated_at = now();
     """))
 
+# ------- Insert data in table "noise_level_h" -----
+
 
 def insert_hours_levels(h_level, conn):
-    """
-    Expect:
-      - station_name : TEXT
-      - d_kst        : date (localdate KST)
-      - hour         : int (1..24)
-      - laeq         : NUMERIC/float (LAeq за час)
-    """
-
     df_tmp = (
         h_level[["station_name", "d_kst", "hour", "laeq"]]
         .dropna(subset=["d_kst", "hour", "laeq"])
@@ -388,6 +395,8 @@ def insert_hours_levels(h_level, conn):
         SET laeq = EXCLUDED.laeq,
             updated_at= now();
     """))
+
+# ------- Calculate noise peak time ----------------
 
 
 def fetch_peak_times(conn, station_id=None, date_from=None, date_to=None):
@@ -435,11 +444,12 @@ def main():
     try:
         engine = connect_engine()
         with engine.begin() as conn:
+            ensure_database(conn)
             ensure_tables(conn)
 
         RAW_DIR = Path("data/raw")
-        files = sorted(RAW_DIR.glob("*.xlsx"))
-        print("Files:", [p.name for p in files])
+        files = [p for p in RAW_DIR.glob(
+            "*.xlsx") if not p.name.startswith("~$")]
 
         for path in files:
             print("→", path)
@@ -462,20 +472,20 @@ def main():
 
                     frames_dn.append(daynight_df)
 
-            # 3) если совсем пусто — пропускаем файл
+            # 3) if not exists -> pass
             total_h = sum(len(x) for x in frames_h)
             total_dn = sum(len(x) for x in frames_dn)
             if total_h == 0 and total_dn == 0:
                 print(f"SKIP (no data): {path}")
                 continue
 
-            # 4) объединяем
+            # 4) join
             all_hours = pd.concat(frames_h, ignore_index=True) if frames_h else pd.DataFrame(
                 columns=["station_name", "date", "hour", "db_level"])
             all_dn = pd.concat(frames_dn, ignore_index=True) if frames_dn else pd.DataFrame(
                 columns=["station_name", "d_kst", "laeq_day", "laeq_night"])
 
-            # 5) чистим имя станции
+            # 5) clean station`s name
             if not all_hours.empty:
                 all_hours["station_name"] = (
                     all_hours["station_name"].astype(str)
@@ -489,9 +499,9 @@ def main():
                     .str.strip()
                 )
 
-            # 6) вставка в БД
+            # 6) insert into database
             with engine.begin() as conn:
-                # станции
+
                 names = pd.concat([
                     all_hours["station_name"]] + ([all_dn["station_name"]] if not all_dn.empty else []),
                     ignore_index=True
@@ -499,17 +509,15 @@ def main():
                 if not names.empty:
                     upsert_stations(names, conn)
 
-                # сырые часы -> noise_reading
                 if not all_hours.empty:
                     insert_measurements(all_hours, conn)
 
-                # агрегируем часовки из noise_reading -> noise_level_h
                 if not all_hours.empty:
-                    # без диапазона; можно добавить from/to
                     refresh_hours_from_readings(conn)
 
-                # готовые день/ночь -> noise_level_d
                 if not all_dn.empty:
+                    if "date" in all_dn.columns:
+                        all_dn = all_dn.rename(columns={"date": "d_kst"})
                     insert_day_night_levels(all_dn, conn)
 
             print(
@@ -518,5 +526,10 @@ def main():
         print("Done!")
 
     except Exception as _ex:
+        import traceback
+        traceback.print_exc()
         print("[INFO] Error while working with PostgreSQL:", _ex)
-        # raise  # опционально пробрасывать дальше
+
+
+if __name__ == "__main__":
+    main()
