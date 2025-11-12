@@ -2,13 +2,12 @@
 
 # NoiseMap Seoul — Python / pgSQL Analytics
 
-Build an interactive map of city noise levels that accounts for Seoul’s most popular locations by district, and identify patterns and drivers such as time of day, traffic, weather, and events.
+Build an interactive map of city noise levels that accounts for Seoul’s most popular locations by district, and identify patterns and drivers such as time of day.
 
 ## Repository contents
 - **/app/** – data ingest & parsing (pandas → PostgreSQL, PostGIS)
 - **/data/raw/** – monthly XLSX sources (by station/sheet)
 - **/sql/** – schema, indexes, convenience views
-- **/notebooks/** – EDA, modeling, sanity checks
 - **/web/** – prototype UI (Streamlit / Mapbox)
 
 ## Features (MVP)

@@ -267,6 +267,25 @@ def upsert_stations(names, conn):
             ON CONFLICT (name) DO NOTHING;
         """), {"n": n})
 
+
+# ------------- Update station`s geo ---------------
+def update_geo(conn):
+    conn.execute(text("""
+            UPDATE
+                stations s
+            SET
+                geom = ST_SetSRID(ST_MakePoint(v.lon, v.lat), 4326)
+            FROM
+                (
+                    VALUES
+                        (1, 127.0561, 37.54457),
+                        (2, 126.9769, 37.56470),
+                        (3, 127.0111, 37.51280),
+                        (4, 126.9429, 37.55950)
+                ) AS v(id, lon, lat)
+            WHERE
+                s.station_id = v.id;
+"""))
 # ------- Insert data in table "noise_reading" -----
 
 
@@ -508,6 +527,7 @@ def main():
                 ) if not all_hours.empty or not all_dn.empty else pd.Series(dtype=str)
                 if not names.empty:
                     upsert_stations(names, conn)
+                    update_geo(conn)
 
                 if not all_hours.empty:
                     insert_measurements(all_hours, conn)

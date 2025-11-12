@@ -31,7 +31,7 @@ def main():
     for lat, lon, name in iter_rows:
         folium.Marker([lat, lon], tooltip=str(name)).add_to(m)
 
-    out = "step1_simple_map.html"
+    out = "web/step1_simple_map.html"
     m.save(out)
     print("Saved:", out)
 

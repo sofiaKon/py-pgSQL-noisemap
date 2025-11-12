@@ -52,13 +52,3 @@ CREATE INDEX IF NOT EXISTS idx_noise_reading_station_ts ON noise_reading (statio
 CREATE INDEX idx_noise_ts ON noise_reading(ts_utc);
 
 CREATE INDEX idx_noise_station ON noise_reading(station_id);
-
-ALTER TABLE
-    stations
-ADD
-    CONSTRAINT uq_stations_name UNIQUE (name);
-
-ALTER TABLE
-    noise_reading
-ADD
-    CONSTRAINT uq_noise_station_ts UNIQUE (station_id, ts_utc);
