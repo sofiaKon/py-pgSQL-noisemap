@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html>
+<head>
+    
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="https://netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap-glyphicons.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.2.0/css/all.min.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/python-visualization/folium/folium/templates/leaflet.awesome.rotate.min.css"/>
+    
+            <meta name="viewport" content="width=device-width,
+                initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+            <style>
+                #map_214ce5ea91c7f4dbb05865be9f3714c5 {
+                    position: relative;
+                    width: 100.0%;
+                    height: 100.0%;
+                    left: 0.0%;
+                    top: 0.0%;
+                }
+                .leaflet-container { font-size: 1rem; }
+            </style>
+
+            <style>html, body {
+                width: 100%;
+                height: 100%;
+                margin: 0;
+                padding: 0;
+            }
+            </style>
+
+            <style>#map {
+                position:absolute;
+                top:0;
+                bottom:0;
+                right:0;
+                left:0;
+                }
+            </style>
+
+            <script>
+                L_NO_TOUCH = false;
+                L_DISABLE_3D = false;
+            </script>
+
+        
+    <script src="https://cdn.jsdelivr.net/gh/python-visualization/folium@main/folium/templates/leaflet_heat.min.js"></script>
+</head>
+<body>
+    
+    
+            <div class="folium-map" id="map_214ce5ea91c7f4dbb05865be9f3714c5" ></div>
+        
+</body>
+<script>
+    
+    
+            var map_214ce5ea91c7f4dbb05865be9f3714c5 = L.map(
+                "map_214ce5ea91c7f4dbb05865be9f3714c5",
+                {
+                    center: [37.545392500000005, 126.99675],
+                    crs: L.CRS.EPSG3857,
+                    ...{
+  "zoom": 13,
+  "zoomControl": false,
+  "preferCanvas": false,
+  "scrollWheelZoom": false,
+  "dragging": false,
+  "minZoom": 13,
+  "maxZoom": 13,
+}
+
+                }
+            );
+
+            
+
+        
+    
+            var rectangle_8d1dcc6133065dbf439d5f5fa6cfb66f = L.rectangle(
+                [[37.38, 126.85], [37.7, 127.15]],
+                {"bubblingMouseEvents": true, "color": null, "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "lightgreen", "fillOpacity": 0.18, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 1.0, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(map_214ce5ea91c7f4dbb05865be9f3714c5);
+        
+    
+            var tile_layer_7cc1a88a2c4c798fb4d946af4e14e59c = L.tileLayer(
+                "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+                {
+  "minZoom": 0,
+  "maxZoom": 19,
+  "maxNativeZoom": 19,
+  "noWrap": false,
+  "attribution": "Seoul Noise Map",
+  "subdomains": "abc",
+  "detectRetina": false,
+  "tms": false,
+  "opacity": 0.9,
+}
+
+            );
+        
+    
+            tile_layer_7cc1a88a2c4c798fb4d946af4e14e59c.addTo(map_214ce5ea91c7f4dbb05865be9f3714c5);
+        
+    
+            var rectangle_3cab937875a4652c9aee466d9ac9f0f6 = L.rectangle(
+                [[37.38, 126.85], [37.7, 127.15]],
+                {"bubblingMouseEvents": true, "color": null, "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "lightgreen", "fillOpacity": 0.25, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 1.0, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(map_214ce5ea91c7f4dbb05865be9f3714c5);
+        
+    
+            var heat_map_184e7f5f9ade689d57e5cdd8cccb34e5 = L.heatLayer(
+                [[37.54457, 127.0561, 1], [37.5647, 126.9769, 1], [37.5128, 127.0111, 1], [37.5595, 126.9429, 1]],
+                {
+  "minOpacity": 0.5,
+  "maxZoom": 12,
+  "radius": 65,
+  "blur": 50,
+  "gradient": {
+  0.85: "green",
+  0.9: "yellow",
+  0.95: "orange",
+  1: "red",
+},
+  "zIndex": 2,
+}
+            );
+        
+    
+            heat_map_184e7f5f9ade689d57e5cdd8cccb34e5.addTo(map_214ce5ea91c7f4dbb05865be9f3714c5);
+        
+    
+            var circle_marker_b5659b2aa2eb4da9eef4c56c371222b0 = L.circleMarker(
+                [37.54457, 127.0561],
+                {"bubblingMouseEvents": true, "color": "red", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "red", "fillOpacity": 0.9, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 8, "stroke": true, "weight": 3}
+            ).addTo(map_214ce5ea91c7f4dbb05865be9f3714c5);
+        
+    
+        var popup_3c3ebd67efa95b5bdbbe9bfed9ee4337 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_636fabaa9e4d6039b2bc548f09648dca = $(`<div id="html_636fabaa9e4d6039b2bc548f09648dca" style="width: 100.0%; height: 100.0%;"><b>성수</b><br>🌞 Day: 72.7 dB<br>🌙 Night: 69.6 dB<br>📊 Average: 71.2 dB</div>`)[0];
+                popup_3c3ebd67efa95b5bdbbe9bfed9ee4337.setContent(html_636fabaa9e4d6039b2bc548f09648dca);
+            
+        
+
+        circle_marker_b5659b2aa2eb4da9eef4c56c371222b0.bindPopup(popup_3c3ebd67efa95b5bdbbe9bfed9ee4337)
+        ;
+
+        
+    
+    
+            circle_marker_b5659b2aa2eb4da9eef4c56c371222b0.bindTooltip(
+                `<div>
+                     성수
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_f2b6942d1857226accdca3c5686a9dad = L.circleMarker(
+                [37.5647, 126.9769],
+                {"bubblingMouseEvents": true, "color": "red", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "red", "fillOpacity": 0.9, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 8, "stroke": true, "weight": 3}
+            ).addTo(map_214ce5ea91c7f4dbb05865be9f3714c5);
+        
+    
+        var popup_cb92e0ba506bbb8f515f67ada0047ae5 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_52dd93283b7cc006f32974bb414764b7 = $(`<div id="html_52dd93283b7cc006f32974bb414764b7" style="width: 100.0%; height: 100.0%;"><b>시청</b><br>🌞 Day: 68.2 dB<br>🌙 Night: 61.8 dB<br>📊 Average: 65.0 dB</div>`)[0];
+                popup_cb92e0ba506bbb8f515f67ada0047ae5.setContent(html_52dd93283b7cc006f32974bb414764b7);
+            
+        
+
+        circle_marker_f2b6942d1857226accdca3c5686a9dad.bindPopup(popup_cb92e0ba506bbb8f515f67ada0047ae5)
+        ;
+
+        
+    
+    
+            circle_marker_f2b6942d1857226accdca3c5686a9dad.bindTooltip(
+                `<div>
+                     시청
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_ac5fb953e84411636d68a269ce8435a4 = L.circleMarker(
+                [37.5128, 127.0111],
+                {"bubblingMouseEvents": true, "color": "red", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "red", "fillOpacity": 0.9, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 8, "stroke": true, "weight": 3}
+            ).addTo(map_214ce5ea91c7f4dbb05865be9f3714c5);
+        
+    
+        var popup_67e81ee2f7020d7e716056aa4f4d06da = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_d913014d7115704ebb87c8a3be627d6c = $(`<div id="html_d913014d7115704ebb87c8a3be627d6c" style="width: 100.0%; height: 100.0%;"><b>신사</b><br>🌞 Day: 70.7 dB<br>🌙 Night: 68.7 dB<br>📊 Average: 69.7 dB</div>`)[0];
+                popup_67e81ee2f7020d7e716056aa4f4d06da.setContent(html_d913014d7115704ebb87c8a3be627d6c);
+            
+        
+
+        circle_marker_ac5fb953e84411636d68a269ce8435a4.bindPopup(popup_67e81ee2f7020d7e716056aa4f4d06da)
+        ;
+
+        
+    
+    
+            circle_marker_ac5fb953e84411636d68a269ce8435a4.bindTooltip(
+                `<div>
+                     신사
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_ca87de41100c62e2d0a4b8fbd0d54a0a = L.circleMarker(
+                [37.5595, 126.9429],
+                {"bubblingMouseEvents": true, "color": "red", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "red", "fillOpacity": 0.9, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 8, "stroke": true, "weight": 3}
+            ).addTo(map_214ce5ea91c7f4dbb05865be9f3714c5);
+        
+    
+        var popup_86909ae4481a8585616554168a64b684 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_af34ee0de653812f4349465251958ffc = $(`<div id="html_af34ee0de653812f4349465251958ffc" style="width: 100.0%; height: 100.0%;"><b>신촌</b><br>🌞 Day: 71.5 dB<br>🌙 Night: 68.9 dB<br>📊 Average: 70.2 dB</div>`)[0];
+                popup_86909ae4481a8585616554168a64b684.setContent(html_af34ee0de653812f4349465251958ffc);
+            
+        
+
+        circle_marker_ca87de41100c62e2d0a4b8fbd0d54a0a.bindPopup(popup_86909ae4481a8585616554168a64b684)
+        ;
+
+        
+    
+    
+            circle_marker_ca87de41100c62e2d0a4b8fbd0d54a0a.bindTooltip(
+                `<div>
+                     신촌
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            map_214ce5ea91c7f4dbb05865be9f3714c5.fitBounds(
+                [[37.38, 126.85], [37.7, 127.15]],
+                {}
+            );
+        
+</script>
+</html>
