@@ -1,26 +1,35 @@
 <p align="right">🌐 Languages: <b>English</b>  <a href="README_ko.md">한국어</a></p>
 
-# NoiseMap Seoul — Python / pgSQL Analytics
+# NoiseMap — Educational Noise Visualization Project  
+---
 
-Build an interactive map of city noise levels that accounts for Seoul’s most popular locations by district, and identify patterns and drivers such as time of day.
+## 🇬🇧 English
+
+### Project Overview
+NoiseMap is an **educational project** focused on learning data processing, peak detection, and geospatial visualization.  
+The noise map is generated from publicly available datasets (stored in `data/raw`) and calculated using formulas documented in the `docs/` folder.
+
+The resulting visualization (HTML map) is intended **only for illustration** — it does not account for terrain effects, reflections, weather conditions, or real-world acoustic modeling.
+
+### Features
+- Processing raw noise-level data
+- PostGIS-ready schema (`stations`, `noise_reading`,`noise_level_d`, `noise_level_h`) with upserts   
+- Calculating daily and global peaks  
+- Aggregating noise levels by hour  
+- Generating an HTML-based noise map  
+- Exporting processed results into Excel tables  
+
+### Calculation Method
+All formulas, assumptions, and data processing workflow are documented in:  
+➡ **`docs/calculation_methods.md`**  
 
 ## Repository contents
 - **/app/** – data ingest & parsing (pandas → PostgreSQL, PostGIS)
 - **/data/raw/** – monthly XLSX sources (by station/sheet)
+- **/docs/** - all formulas, assumptions, and data processing workflow
 - **/sql/** – schema, indexes, convenience views
 - **/web/** – prototype UI (Streamlit / Mapbox)
 
-## Features (MVP)
-- XLSX → long format (date, hour, station, dB) with timezone-aware UTC timestamps  
-- PostGIS-ready schema (`stations`, `noise_reading`) with upserts  
-- Basic analytics: daily/weekly profiles, night vs day, top districts  
-- Hooks for enrichment: hourly weather, traffic, events
-
-## Data pipeline
-1. **Parse** monthly Excel files (one sheet per station)  
-2. **Normalize** to hourly rows (`date + (hour-1)h`, Asia/Seoul → UTC)  
-3. **Load** into PostgreSQL with conflict-safe inserts  
-4. (Optional) **Enrich** with weather/traffic/events
 
 ## Data sources
 - **Noise (primary):** Monthly XLSX exports (Jan–Jun 2025) from **Seoul Open Data Plaza**  
@@ -33,21 +42,15 @@ Build an interactive map of city noise levels that accounts for Seoul’s most p
 > subject to the publisher’s terms. Replace or augment with your own sources as needed.
 
 ## Database schema (public)
-- `stations (station_id PK, name UNIQUE, geom geometry(Point,4326) NULL)`  
-- `noise_reading (reading_id PK, station_id FK, ts_utc timestamptz, db_level numeric(5,2), part_of_day text, src_month date GENERATED, UNIQUE(station_id, ts_utc))`
+- located **/sql/import.sql/**
 
 ## Quick start
 
 ```bash
-python -m venv .venv && source .venv/bin/activate    # (Windows: .venv\Scripts\Activate.ps1)
+python -m venv .venv && source .venv/bin/activate  
 pip install -U pip pandas openpyxl SQLAlchemy psycopg2-binary
 python app/main.py
 ```
-# Roadmap
-Weather/traffic/event enrichment
-Interactive map (Streamlit/Mapbox)
-Forecasts & anomaly detection (Prophet/ARIMA + regressors)
-CI checks & data quality dashboard
 
 ## Configuration
 Create/edit `app/config.env` and **replace the password with your own**:

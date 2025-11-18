@@ -286,6 +286,7 @@ def update_geo(conn):
             WHERE
                 s.station_id = v.id;
 """))
+
 # ------- Insert data in table "noise_reading" -----
 
 
